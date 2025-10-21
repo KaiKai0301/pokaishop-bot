@@ -1,14 +1,4 @@
-# Fix for imghdr deprecation in Python 3.11+
-import sys
-try:
-    import imghdr
-except ImportError:
-    # Create a dummy imghdr module for Python 3.11+ compatibility
-    class DummyImghdr:
-        def what(self, *args, **kwargs):
-            return None
-    sys.modules['imghdr'] = DummyImghdr()
-    imghdr = DummyImghdr()
+
 
 import logging
 import re
@@ -696,7 +686,7 @@ def private_chat_only(func):
     return wrapper
 
 @private_chat_only
-async def start(update: Update, context: CallbackContext):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a welcome message when the command /start is issued."""
     user = update.effective_user
     
@@ -4915,10 +4905,7 @@ async def handle_new_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     """Start the bot."""
     # Create the Application
-    from telegram.ext import Updater
-    updater = Updater(TOKEN, use_context=True)
-    application = updater.dispatcher    
-
+    application = Application.builder().token(TOKEN).build()
     
     # Add debug logging for admin IDs
     logger.info(f"Admin IDs: {ADMIN_IDS}")
@@ -4952,7 +4939,7 @@ def main():
     application.add_handler(conv_handler)
 
     # THEN add individual command handlers
-    application.add_handler(CommandHandler("start", start, pass_job_queue=True))
+    application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("list", list_claims))
     application.add_handler(CommandHandler("invoice", invoice))
@@ -4998,8 +4985,7 @@ def main():
     ), group=1)  
     
     # Start the Bot
-    updater.start_polling()
-    updater.idle()
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
     main()  
