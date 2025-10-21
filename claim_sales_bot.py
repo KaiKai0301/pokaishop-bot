@@ -4904,88 +4904,94 @@ async def handle_new_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     """Start the bot."""
-    # Create the Application
-    application = Application.builder().token(TOKEN).build()
-    
-    # Add debug logging for admin IDs
-    logger.info(f"Admin IDs: {ADMIN_IDS}")
-    
-    # Add storage reminder job
-    application.job_queue.run_repeating(
-        check_storage_reminders,
-        interval=timedelta(hours=24),  # Check daily
-        first=10  # Start after 10 seconds
-    )
-    
-    # Conversation handler
-    conv_handler = ConversationHandler(
-        entry_points=[
-            CommandHandler('pay', pay_command),
-            CommandHandler('shipping', shipping_command),
-            CommandHandler('undo', undo_command)
-        ],
-        states={
-            SHIPPING_METHOD: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, shipping_method)
+    try:
+        # Create the Application (MODERN v20+ WAY)
+        application = Application.builder().token(TOKEN).build()
+        
+        # Add debug logging for admin IDs
+        logger.info(f"Admin IDs: {ADMIN_IDS}")
+        
+        # Add storage reminder job
+        application.job_queue.run_repeating(
+            check_storage_reminders,
+            interval=timedelta(hours=24),  # Check daily
+            first=10  # Start after 10 seconds
+        )
+        
+        # Conversation handler
+        conv_handler = ConversationHandler(
+            entry_points=[
+                CommandHandler('pay', pay_command),
+                CommandHandler('shipping', shipping_command),
+                CommandHandler('undo', undo_command)
             ],
-            UNDO_SHIPPING: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, undo_shipping)
-            ],
-        },
-        fallbacks=[CommandHandler('cancel', cancel)],
-    )
+            states={
+                SHIPPING_METHOD: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, shipping_method)
+                ],
+                UNDO_SHIPPING: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, undo_shipping)
+                ],
+            },
+            fallbacks=[CommandHandler('cancel', cancel)],
+        )
 
-    # Add ConversationHandler FIRST
-    application.add_handler(conv_handler)
+        # Add ConversationHandler FIRST
+        application.add_handler(conv_handler)
 
-    # THEN add individual command handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("list", list_claims))
-    application.add_handler(CommandHandler("invoice", invoice))
-    application.add_handler(CommandHandler("tracking", tracking_command))
-    application.add_handler(CommandHandler("summary", admin_summary))
-    application.add_handler(CommandHandler("reminder", reminder_command))
-    application.add_handler(CommandHandler("auction_status", auction_status))
-    application.add_handler(CommandHandler("debug_posts", debug_posts))
-    application.add_handler(CommandHandler("debug_multiple", debug_multiple))
-    application.add_handler(CommandHandler("setup_sheet", setup_sheet_command))
-    application.add_handler(CommandHandler("recover_post", recover_post))
-    application.add_handler(CommandHandler("debug_claim", debug_claim))
-    application.add_handler(CommandHandler("test_posts", test_post_detection))
-    application.add_handler(CommandHandler("record_manual", record_manual))
-    application.add_handler(CommandHandler("debug_sheets", debug_sheets))
-    application.add_handler(CommandHandler("reset_all_claims", reset_all_claims))
-    application.add_handler(CommandHandler("reset_user", reset_specific_user))
-    application.add_handler(CommandHandler("reset_status", reset_status))
-    application.add_handler(CommandHandler("find_user", find_user))
-    application.add_handler(CommandHandler("test_ai", test_ai_response))
-    
-    # FIXED HANDLER ORDER - SIMPLIFIED APPROACH
-    
-    # 1. Single handler for ALL post categorization (including auctions)
-    application.add_handler(MessageHandler(
-        (filters.TEXT | filters.CAPTION) & ~filters.COMMAND & ~filters.REPLY,
-        handle_new_post
-    ))
-    
-    # 2. Handler for user interactions (replies)
-    application.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & filters.REPLY,
-        handle_message
-    ))
+        # THEN add individual command handlers
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("help", help_command))
+        application.add_handler(CommandHandler("list", list_claims))
+        application.add_handler(CommandHandler("invoice", invoice))
+        application.add_handler(CommandHandler("tracking", tracking_command))
+        application.add_handler(CommandHandler("summary", admin_summary))
+        application.add_handler(CommandHandler("reminder", reminder_command))
+        application.add_handler(CommandHandler("auction_status", auction_status))
+        application.add_handler(CommandHandler("debug_posts", debug_posts))
+        application.add_handler(CommandHandler("debug_multiple", debug_multiple))
+        application.add_handler(CommandHandler("setup_sheet", setup_sheet_command))
+        application.add_handler(CommandHandler("recover_post", recover_post))
+        application.add_handler(CommandHandler("debug_claim", debug_claim))
+        application.add_handler(CommandHandler("test_posts", test_post_detection))
+        application.add_handler(CommandHandler("record_manual", record_manual))
+        application.add_handler(CommandHandler("debug_sheets", debug_sheets))
+        application.add_handler(CommandHandler("reset_all_claims", reset_all_claims))
+        application.add_handler(CommandHandler("reset_user", reset_specific_user))
+        application.add_handler(CommandHandler("reset_status", reset_status))
+        application.add_handler(CommandHandler("find_user", find_user))
+        application.add_handler(CommandHandler("test_ai", test_ai_response))
+        
+        # FIXED HANDLER ORDER - SIMPLIFIED APPROACH
+        
+        # 1. Single handler for ALL post categorization (including auctions)
+        application.add_handler(MessageHandler(
+            (filters.TEXT | filters.CAPTION) & ~filters.COMMAND & ~filters.REPLY,
+            handle_new_post
+        ))
+        
+        # 2. Handler for user interactions (replies)
+        application.add_handler(MessageHandler(
+            filters.TEXT & ~filters.COMMAND & filters.REPLY,
+            handle_message
+        ))
 
-     # Add AI conversation handler (catches ALL non-command messages in private chats)
-    application.add_handler(MessageHandler(
-        filters.TEXT & 
-        ~filters.COMMAND & 
-        ~filters.REPLY &
-        filters.ChatType.PRIVATE,  # ONLY in private chats
-        handle_ai_conversation
-    ), group=1)  
-    
-    # Start the Bot
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+        # Add AI conversation handler (catches ALL non-command messages in private chats)
+        application.add_handler(MessageHandler(
+            filters.TEXT & 
+            ~filters.COMMAND & 
+            ~filters.REPLY &
+            filters.ChatType.PRIVATE,  # ONLY in private chats
+            handle_ai_conversation
+        ), group=1)  
+        
+        # Start the Bot (MODERN WAY)
+        logger.info("🤖 Bot starting polling...")
+        application.run_polling()
+        logger.info("✅ Bot is now polling for messages!")
+        
+    except Exception as e:
+        logger.error(f"❌ Bot failed to start: {e}")
 
 if __name__ == "__main__":
     main()  
