@@ -4903,22 +4903,16 @@ async def handle_new_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
-    """Start the bot."""
+    """Start the bot - CLEAN VERSION"""
     try:
-        # Create the Application (MODERN v20+ WAY)
+        # Create the Application (MODERN v20.7 WAY)
         application = Application.builder().token(TOKEN).build()
         
-        # Add debug logging for admin IDs
-        logger.info(f"Admin IDs: {ADMIN_IDS}")
+        logger.info("🤖 Bot starting with clean setup...")
         
-        # Add storage reminder job
-        application.job_queue.run_repeating(
-            check_storage_reminders,
-            interval=timedelta(hours=24),  # Check daily
-            first=10  # Start after 10 seconds
-        )
+        # ===== ADD ALL YOUR HANDLERS =====
         
-        # Conversation handler
+        # 1. Conversation Handler FIRST
         conv_handler = ConversationHandler(
             entry_points=[
                 CommandHandler('pay', pay_command),
@@ -4935,11 +4929,9 @@ def main():
             },
             fallbacks=[CommandHandler('cancel', cancel)],
         )
-
-        # Add ConversationHandler FIRST
         application.add_handler(conv_handler)
 
-        # THEN add individual command handlers
+        # 2. Command Handlers
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CommandHandler("help", help_command))
         application.add_handler(CommandHandler("list", list_claims))
@@ -4961,37 +4953,43 @@ def main():
         application.add_handler(CommandHandler("reset_status", reset_status))
         application.add_handler(CommandHandler("find_user", find_user))
         application.add_handler(CommandHandler("test_ai", test_ai_response))
-        
-        # FIXED HANDLER ORDER - SIMPLIFIED APPROACH
-        
-        # 1. Single handler for ALL post categorization (including auctions)
-        application.add_handler(MessageHandler(
-            (filters.TEXT | filters.CAPTION) & ~filters.COMMAND & ~filters.REPLY,
-            handle_new_post
-        ))
-        
-        # 2. Handler for user interactions (replies)
+
+        # 3. Message Handlers (CORRECT ORDER)
+        # Handler for user interactions (replies)
         application.add_handler(MessageHandler(
             filters.TEXT & ~filters.COMMAND & filters.REPLY,
             handle_message
         ))
 
-        # Add AI conversation handler (catches ALL non-command messages in private chats)
+        # Handler for new posts
+        application.add_handler(MessageHandler(
+            (filters.TEXT | filters.CAPTION) & ~filters.COMMAND & ~filters.REPLY,
+            handle_new_post
+        ))
+
+        # Handler for AI conversations in private chats
         application.add_handler(MessageHandler(
             filters.TEXT & 
             ~filters.COMMAND & 
             ~filters.REPLY &
-            filters.ChatType.PRIVATE,  # ONLY in private chats
+            filters.ChatType.PRIVATE,
             handle_ai_conversation
-        ), group=1)  
-        
-        # Start the Bot (MODERN WAY)
-        logger.info("🤖 Bot starting polling...")
-        application.run_polling()
-        logger.info("✅ Bot is now polling for messages!")
+        ), group=1)
+
+        # ===== START THE BOT =====
+        logger.info("✅ Starting bot polling...")
+        application.run_polling(
+            drop_pending_updates=True,
+            allowed_updates=None
+        )
         
     except Exception as e:
         logger.error(f"❌ Bot failed to start: {e}")
+        # Wait and restart
+        import time
+        time.sleep(5)
+        logger.info("🔄 Restarting bot...")
+        main()
 
 if __name__ == "__main__":
     main()  

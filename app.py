@@ -20,9 +20,9 @@ def health():
 def run_bot():
     try:
         logger.info("Starting Telegram bot...")
-        # Import and run your bot
-        from claim_sales_bot import main
-        main()
+        # DON'T import at the top - import inside the function to avoid conflicts
+        import claim_sales_bot
+        claim_sales_bot.main()
     except Exception as e:
         logger.error(f"Error running bot: {e}")
 
