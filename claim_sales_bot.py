@@ -17,12 +17,15 @@ import threading
 
 # === ADD GOOGLE SHEETS IMPORTS ===
 import os
+from dotenv import load_dotenv
 import json
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+
+load_dotenv()
 
 # === ADD DEEPSEEK IMPORTS ===
 import httpx
@@ -34,6 +37,11 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+TOKEN = os.getenv('TOKEN')
+DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
+SPREADSHEET_ID = os.getenv('SPREADSHEET_ID')
+ADMIN_IDS = [int(x) for x in os.getenv('ADMIN_IDS', '').split(',')]
 
 # Thread-safe dictionaries to store data
 class ThreadSafeDict:
@@ -101,22 +109,48 @@ conversation_memory = ThreadSafeConversationMemory()
 
 # === COMPLETE SMART GOOGLE SHEETS SYSTEM ===
 def get_sheets_service():
-    """Simple Google Sheets authentication"""
-    creds = None
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
+    """Google Sheets authentication for server deployment"""
+    try:
+        # Method 1: Service account from environment variable (for Render)
+        service_account_json = os.getenv('SERVICE_ACCOUNT_JSON')
+        if service_account_json:
+            import json
+            from google.oauth2 import service_account
+            creds_info = json.loads(service_account_json)
+            creds = service_account.Credentials.from_service_account_info(
+                creds_info, 
+                scopes=SCOPES
+            )
+            logger.info("Using service account from environment variable")
+            return build('sheets', 'v4', credentials=creds)
         
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
-    
-    return build('sheets', 'v4', credentials=creds)
+        # Method 2: Service account file (for local development)
+        elif os.path.exists('service_account.json'):
+            from google.oauth2 import service_account
+            creds = service_account.Credentials.from_service_account_file(
+                'service_account.json', 
+                scopes=SCOPES
+            )
+            logger.info("Using service account from file")
+            return build('sheets', 'v4', credentials=creds)
+        
+        # Method 3: OAuth2 (for local development with browser)
+        elif os.path.exists('token.json'):
+            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+            if creds and creds.valid:
+                logger.info("Using OAuth2 credentials")
+                return build('sheets', 'v4', credentials=creds)
+            elif creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+                logger.info("Refreshed OAuth2 credentials")
+                return build('sheets', 'v4', credentials=creds)
+        
+        logger.warning("No Google Sheets credentials available")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error getting sheets service: {e}")
+        return None
 
 async def ensure_headers(service):
     """Ensure headers exist in the sheet with simplified columns."""
@@ -150,22 +184,17 @@ async def ensure_headers(service):
         logger.error(f"Error ensuring headers: {e}")
 
 async def record_post_immediately(message_id, text, post_type):
-    """Record a post immediately when it's posted - ONLY for claim/multi/auction posts."""
+    """Record a post immediately when it's posted."""
     try:
-        # ✅ FIX: Double-check that we should record this post type
         if post_type not in ["claim", "multi", "auction"]:
-            logger.info(f"⏭️ Skipping Google Sheets recording for {post_type} post {message_id}")
             return
             
-        logger.info(f"🔍 STARTING Google Sheets recording for {post_type} post {message_id}")
-        
-        # Get service with error handling
-        try:
-            service = get_sheets_service()
-            logger.info(f"✅ Google Sheets service initialized for message {message_id}")
-        except Exception as e:
-            logger.error(f"❌ FAILED to get Google Sheets service: {e}")
+        service = get_sheets_service()
+        if not service:
+            logger.warning("Google Sheets service not available - skipping recording")
             return
+            
+        # Rest of your existing function code...     
             
         try:
             await ensure_headers(service)
@@ -624,27 +653,20 @@ ADMIN_IDS = [
     -1002970517345
 ]
 
-# Admin user IDs and channel IDs (replace with your actual IDs)
-ADMIN_IDS = [
-    5094180912,  # Your personal user ID
-    -1002742177157,  # Your channel ID (negative number)
-    -1002840189860,  # Your channel ID (negative number)
-    -1002730121603,
-    -1002970517345
-
-]
-
-# Bot token (replace with your actual token)
-TOKEN = "8456466564:AAFtPxI6RX_lR0AWYuv_8Gp0M61cPduE0Ps"
+# Replace your hardcoded values with environment variables
+TOKEN = os.getenv('TOKEN', '8456466564:AAFtPxI6RX_lR0AWYuv_8Gp0M61cPduE0Ps')
+DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', 'sk-00f9d66134fe4e26a56b6b9d692c751f')
+SPREADSHEET_ID = os.getenv('SPREADSHEET_ID', '1UHoUClr3BLcm4jmEUHSPgXT9--G3r0GqKN9n0SMWUUc')
 
 # Google Sheets configuration
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
-SPREADSHEET_ID = '1UHoUClr3BLcm4jmEUHSPgXT9--G3r0GqKN9n0SMWUUc'  # Your actual ID
 SHEET_NAME = 'Claims Data'
 CREDENTIALS_FILE = 'credentials.json'
 
+admin_ids_str = os.getenv('ADMIN_IDS', '5094180912,-1002742177157,-1002840189860,-1002730121603,-1002970517345')
+ADMIN_IDS = [int(x.strip()) for x in admin_ids_str.split(',') if x.strip()]
+
 # === ADD DEEPSEEK CONFIGURATION ===
-DEEPSEEK_API_KEY = "sk-00f9d66134fe4e26a56b6b9d692c751f"  # Get from https://platform.deepseek.com/
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
 
@@ -4951,16 +4973,17 @@ def main():
         handle_message
     ))
 
-   application.add_handler(MessageHandler(
+     # Add AI conversation handler (catches ALL non-command messages in private chats)
+    application.add_handler(MessageHandler(
         filters.TEXT & 
         ~filters.COMMAND & 
         ~filters.REPLY &
         filters.ChatType.PRIVATE,  # ONLY in private chats
         handle_ai_conversation
-    ), group=1) 
+    ), group=1)  
     
     # Start the Bot
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    main() 
+    main()  
