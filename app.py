@@ -19,12 +19,12 @@ def health():
 
 def run_bot():
     try:
-        logger.info("Starting Telegram bot...")
-        # DON'T import at the top - import inside the function to avoid conflicts
-        import claim_sales_bot
-        claim_sales_bot.main()
+        logger.info("Starting CLEAN Telegram bot...")
+        # Import the CLEAN bot
+        from bot_clean import main
+        main()
     except Exception as e:
-        logger.error(f"Error running bot: {e}")
+        logger.error(f"Error running clean bot: {e}")
 
 if __name__ == "__main__":
     # Start bot in a separate thread
