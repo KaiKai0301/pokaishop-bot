@@ -1,3 +1,15 @@
+# Fix for imghdr deprecation in Python 3.11+
+import sys
+try:
+    import imghdr
+except ImportError:
+    # Create a dummy imghdr module for Python 3.11+ compatibility
+    class DummyImghdr:
+        def what(self, *args, **kwargs):
+            return None
+    sys.modules['imghdr'] = DummyImghdr()
+    imghdr = DummyImghdr()
+
 import logging
 import re
 from datetime import datetime, timedelta
